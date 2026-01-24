@@ -71,3 +71,18 @@ Não existem mais ataques de oportunidade por deslocamento. Para fazer ataques d
 - Recarregar qualquer arma de distância.
 - Fazer um ataque desarmado sem Proficiência contra um inimigo armado.
 - Situações narrativas que o mestre considere adequadas.
+
+
+## Sons Customizados ⚡
+
+O sistema suporta tocar sons customizados em eventos específicos (como críticos).
+
+### Thunderstruck
+Toca um som especial quando um jogador específico acerta um crítico com dano de trovão.
+
+**Configuração:**
+1. Coloque o arquivo de áudio em `sounds/thunderstruck.mp3`
+2. Edite `scripts/thunderstruck.js` e configure o nome do personagem
+3. Ajuste volume e outras opções conforme necessário
+
+Ver `sounds/README.md` para instruções detalhadas.
