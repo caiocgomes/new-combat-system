@@ -14,13 +14,13 @@ Para usar o efeito sonoro de "Thunderstruck":
 ```javascript
 const CONFIG_THUNDERSTRUCK = {
   playerName: "Nome do Personagem Aqui",  // ← EDITE AQUI
+  weaponName: "Nome da Arma Aqui",        // ← E AQUI
   audioPath: "sounds/thunderstruck.mp3",
-  volume: 0.7,
-  checkThunderDamage: true,
-  thunderKeywords: ["thunder", "trovão", "lightning", "relâmpago"]
+  volume: 0.7
 };
 ```
 
 5. Substitua `"Nome do Personagem Aqui"` pelo nome exato do personagem no Foundry
+6. Substitua `"Nome da Arma Aqui"` pelo nome exato da arma no inventário
 
-**Pronto!** Agora toda vez que esse personagem rolar um crítico com dano de trovão, o som vai tocar para todos os jogadores! ⚡
+**Pronto!** Agora toda vez que esse personagem rolar um crítico com essa arma específica, o som vai tocar para todos os jogadores! ⚡

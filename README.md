@@ -78,11 +78,11 @@ Não existem mais ataques de oportunidade por deslocamento. Para fazer ataques d
 O sistema suporta tocar sons customizados em eventos específicos (como críticos).
 
 ### Thunderstruck
-Toca um som especial quando um jogador específico acerta um crítico com dano de trovão.
+Toca um som especial quando um jogador específico acerta um crítico com uma arma específica.
 
 **Configuração:**
 1. Coloque o arquivo de áudio em `sounds/thunderstruck.mp3`
-2. Edite `scripts/thunderstruck.js` e configure o nome do personagem
+2. Edite `scripts/thunderstruck.js` e configure o nome do personagem e da arma
 3. Ajuste volume e outras opções conforme necessário
 
 Ver `sounds/README.md` para instruções detalhadas.

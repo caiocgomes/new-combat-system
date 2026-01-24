@@ -8,20 +8,16 @@ Hooks.once("ready", () => {
     // Nome do personagem que tem a arma de trovão
     playerName: "Nome do Personagem Aqui",
 
+    // Nome da arma que dispara o efeito
+    // Exemplo: "Martelo de Trovão", "Lança Relampejante", etc.
+    weaponName: "Nome da Arma Aqui",
+
     // Caminho do arquivo de áudio (relativo à pasta do módulo)
     // Exemplo: "sounds/thunderstruck.mp3"
     audioPath: "sounds/thunderstruck.mp3",
 
     // Volume do som (0.0 a 1.0)
-    volume: 0.7,
-
-    // Verificar se o dano é de trovão? (true/false)
-    // Se false, toca em qualquer crítico do jogador
-    checkThunderDamage: true,
-
-    // Palavra-chave para detectar dano de trovão
-    // Procura por "thunder" ou "trovão" na descrição do dano
-    thunderKeywords: ["thunder", "trovão", "lightning", "relâmpago"]
+    volume: 0.7
   };
 
   // ========================================
@@ -39,48 +35,12 @@ Hooks.once("ready", () => {
     // Verifica se é o jogador configurado
     if (actor.name !== CONFIG_THUNDERSTRUCK.playerName) return;
 
-    console.log(`⚡ Crítico detectado de ${actor.name}!`);
+    // Verifica se é a arma configurada
+    if (item.name !== CONFIG_THUNDERSTRUCK.weaponName) return;
 
-    // Se não precisa verificar dano de trovão, já toca
-    if (!CONFIG_THUNDERSTRUCK.checkThunderDamage) {
-      playThunderstruck();
-      return;
-    }
-
-    // Verifica se o item tem dano de trovão
-    const hasThunderDamage = checkForThunderDamage(item);
-
-    if (hasThunderDamage) {
-      console.log("⚡⚡⚡ THUNDERSTRUCK! ⚡⚡⚡");
-      playThunderstruck();
-    }
+    console.log(`⚡⚡⚡ THUNDERSTRUCK! ${actor.name} acertou crítico com ${item.name}! ⚡⚡⚡`);
+    playThunderstruck();
   });
-
-  function checkForThunderDamage(item) {
-    // Verifica nos dados do item
-    const damageTypes = item.system?.damage?.parts || [];
-
-    for (const [formula, type] of damageTypes) {
-      // Verifica se o tipo de dano contém alguma palavra-chave
-      const typeStr = (type || "").toLowerCase();
-      const isThunder = CONFIG_THUNDERSTRUCK.thunderKeywords.some(
-        keyword => typeStr.includes(keyword.toLowerCase())
-      );
-
-      if (isThunder) {
-        return true;
-      }
-    }
-
-    // Também verifica no nome e descrição do item
-    const itemName = (item.name || "").toLowerCase();
-    const itemDesc = (item.system?.description?.value || "").toLowerCase();
-    const searchText = itemName + " " + itemDesc;
-
-    return CONFIG_THUNDERSTRUCK.thunderKeywords.some(
-      keyword => searchText.includes(keyword.toLowerCase())
-    );
-  }
 
   function playThunderstruck() {
     const audioPath = CONFIG_THUNDERSTRUCK.audioPath;
