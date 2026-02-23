@@ -6,11 +6,11 @@ Hooks.once("ready", () => {
   // ========================================
   const CONFIG_THUNDERSTRUCK = {
     // Nome do personagem que tem a arma de trovão
-    playerName: "Nome do Personagem Aqui",
+    playerName: "Jerinos",
 
     // Nome da arma que dispara o efeito
     // Exemplo: "Martelo de Trovão", "Lança Relampejante", etc.
-    weaponName: "Nome da Arma Aqui",
+    weaponName: "+1 Mace of thunder",
 
     // Caminho do arquivo de áudio (relativo à pasta do módulo)
     // Exemplo: "sounds/thunderstruck.mp3"
