@@ -175,6 +175,6 @@ Hooks.once("ready", () => {
 
       return attackRoll;
     },
-    "WRAPPER"
+    "MIXED"
   );
 });
