@@ -8,39 +8,22 @@ Hooks.once("ready", () => {
     return;
   }
 
-  // Hook global – só registra uma vez
+  // Hook para botão de dano na mensagem de resultado
   Hooks.on("renderChatMessage", (message, html, data) => {
-    html.find(".defense-roll").on("click", async (event) => {
+    html.find(".damage-roll-btn").on("click", async (event) => {
       event.preventDefault();
+      const btn = event.currentTarget;
+      const actorId = btn.dataset.actorId;
+      const itemId = btn.dataset.itemId;
 
-      const messageId = event.currentTarget.dataset.messageId;
-      console.log("Botão clicado!", messageId);
-
-      const chatMessage = game.messages.get(messageId);
-      if (!chatMessage) return;
-
-      const actor = ChatMessage.getSpeakerActor(chatMessage.speaker);
-      if (!actor) {
-        ui.notifications.warn(
-          "Ator não encontrado para esta rolagem de defesa."
-        );
+      const actor = game.actors.get(actorId);
+      const item = actor?.items.get(itemId);
+      if (!item) {
+        ui.notifications.warn("Arma não encontrada para rolar dano.");
         return;
       }
 
-      const defenseBonus = actor.system.attributes.ac.value - 10;
-      const formula = `1d20 + ${defenseBonus}`;
-
-      await dnd5e.dice.d20Roll({
-        actor,
-        data: actor.getRollData(),
-        parts: [defenseBonus],
-        title: `🛡️ Defesa Ativa de ${actor.name}`,
-        flavor: `🛡️ Defesa Ativa de <strong>${actor.name}</strong>`,
-        fastForward: false,
-        rollMode: game.settings.get("core", "rollMode"),
-      });
-
-      console.log(`Rolando defesa para ${actor.name}`);
+      await item.rollDamage();
     });
   });
 
@@ -119,23 +102,38 @@ Hooks.once("ready", () => {
       // Executa o ataque
       const attackRoll = await wrapped(...args);
 
-      // Cria botão de defesa para o alvo selecionado
+      // Atacante cancelou o dialog de ataque
+      if (!attackRoll) return null;
+
+      // Rola defesa automaticamente
       const targetToken = canvas.tokens.get(selectedTokenId);
-      if (targetToken?.actor) {
-        const targetActor = targetToken.actor;
+      if (!targetToken?.actor) return attackRoll;
 
-        const message = await ChatMessage.create({
-          user: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          content: `<button class="defense-roll" data-message-id="PLACEHOLDER">🎯 Rolar Defesa</button>`,
-        });
+      const targetActor = targetToken.actor;
+      const defenseBonus = targetActor.system.attributes.ac.value - 10;
+      const defenseRoll = await new Roll(`1d20 + ${defenseBonus}`).evaluate({async: true});
 
-        const updatedContent = message.content.replace(
-          "PLACEHOLDER",
-          message.id
-        );
-        await message.update({ content: updatedContent });
-      }
+      // Compara resultado
+      const hit = attackRoll.total >= defenseRoll.total;
+      const resultText = hit ? "✅ O ataque <strong>ACERTOU</strong>!" : "❌ O ataque <strong>ERROU</strong>!";
+
+      // Mensagem unificada com resultado e botão de dano
+      const attackerName = this.actor.name;
+      const content = `
+        <div style="border:1px solid #999; border-radius:6px; padding:8px; margin:4px 0;">
+          <p><strong>⚔️ ${attackerName} atacou ${targetActor.name}!</strong></p>
+          <p>🎲 Ataque: <strong>${attackRoll.total}</strong> <span style="opacity:0.7">(${attackRoll.formula})</span></p>
+          <p>🛡️ Defesa: <strong>${defenseRoll.total}</strong> <span style="opacity:0.7">(1d20 + ${defenseBonus})</span></p>
+          <p>${resultText}</p>
+          <button class="damage-roll-btn" data-actor-id="${this.actor.id}" data-item-id="${this.id}">🎲 Rolar Dano</button>
+        </div>
+      `;
+
+      await ChatMessage.create({
+        user: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content,
+      });
 
       return attackRoll;
     },
