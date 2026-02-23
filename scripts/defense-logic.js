@@ -1,3 +1,14 @@
+Hooks.once("init", () => {
+  game.settings.register("new-combat-system", "filterByRange", {
+    name: "Filter targets by weapon range",
+    hint: "Only show targets within weapon range in the target selection dialog. Targets beyond normal range but within long range are marked with disadvantage.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+});
+
 Hooks.once("ready", () => {
   console.log("Custom Defense Bonus system with button loaded");
 
@@ -27,15 +38,27 @@ Hooks.once("ready", () => {
     });
   });
 
-  // Monta HTML do dialog com radio buttons para cada combatente
+  function getGridDistance(tokenA, tokenB) {
+    return canvas.grid.measureDistance(tokenA.center, tokenB.center, { gridSpaces: true });
+  }
+
+  function getWeaponRange(item) {
+    const normal = item.system.range?.value || 5;
+    const long = item.system.range?.long || null;
+    return { normal, long };
+  }
+
   function buildTargetDialogContent(combatants) {
     const radios = combatants
       .map(
-        (c, i) =>
-          `<label style="display:block; margin:4px 0; cursor:pointer;">
+        (c, i) => {
+          const distLabel = `(${Math.round(c.distance)}ft)`;
+          const disadvLabel = c.disadvantage ? ' <span style="color:#e74c3c; font-weight:bold;">⚠️ desvantagem</span>' : '';
+          return `<label style="display:block; margin:4px 0; cursor:pointer;">
             <input type="radio" name="target" value="${c.tokenId}" ${i === 0 ? "checked" : ""}/>
-            ${c.name}
-          </label>`
+            ${c.name} <span style="opacity:0.7">${distLabel}</span>${disadvLabel}
+          </label>`;
+        }
       )
       .join("");
     return `<form><p><strong>Escolha o alvo:</strong></p>${radios}</form>`;
@@ -58,21 +81,36 @@ Hooks.once("ready", () => {
         canvas.tokens.controlled[0] ||
         canvas.tokens.placeables.find((t) => t.actor?.id === this.actor.id);
 
+      const filterByRange = game.settings.get("new-combat-system", "filterByRange");
+      const weaponRange = getWeaponRange(this);
+      const maxRange = weaponRange.long || weaponRange.normal;
+
       // Coleta combatentes válidos (exclui o atacante, exige token no canvas)
-      const validCombatants = game.combat.combatants
+      let validCombatants = game.combat.combatants
         .filter((c) => {
           const token = canvas.tokens.get(c.tokenId);
           if (!token) return false;
           if (attackerToken && token.id === attackerToken.id) return false;
           return true;
         })
-        .map((c) => ({
-          tokenId: c.tokenId,
-          name: c.name,
-        }));
+        .map((c) => {
+          const token = canvas.tokens.get(c.tokenId);
+          const distance = attackerToken ? getGridDistance(attackerToken, token) : 0;
+          const disadvantage = weaponRange.long ? (distance > weaponRange.normal && distance <= weaponRange.long) : false;
+          return {
+            tokenId: c.tokenId,
+            name: c.name,
+            distance,
+            disadvantage,
+          };
+        });
+
+      if (filterByRange && attackerToken) {
+        validCombatants = validCombatants.filter((c) => c.distance <= maxRange);
+      }
 
       if (validCombatants.length === 0) {
-        ui.notifications.warn("Nenhum alvo disponível no combate.");
+        ui.notifications.warn(filterByRange ? "Nenhum alvo ao alcance." : "Nenhum alvo disponível no combate.");
         return null;
       }
 
