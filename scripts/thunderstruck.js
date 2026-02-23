@@ -14,7 +14,7 @@ Hooks.once("ready", () => {
 
     // Caminho do arquivo de áudio (relativo à pasta do módulo)
     // Exemplo: "sounds/thunderstruck.mp3"
-    audioPath: "sounds/thunderstruck.mp3",
+    audioPath: "modules/new-combat-system/sounds/thunderstruck.mp3",
 
     // Volume do som (0.0 a 1.0)
     volume: 0.7
