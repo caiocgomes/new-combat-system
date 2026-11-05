@@ -1,3 +1,4 @@
+// Ported to Foundry 14 and dnd5e 6: the attack hook now receives (rolls, { subject }).
 Hooks.once("ready", () => {
   console.log("⚡ Thunderstruck! Sistema de som de crítico carregado");
 
@@ -25,11 +26,12 @@ Hooks.once("ready", () => {
   // ========================================
 
   // Hook para interceptar rolagens de ataque
-  Hooks.on("dnd5e.rollAttack", (item, roll) => {
+  Hooks.on("dnd5e.rollAttack", (rolls, { subject } = {}) => {
     // Verifica se foi crítico
-    if (!roll.isCritical) return;
+    if (!rolls?.[0]?.isCritical) return;
 
-    const actor = item.actor;
+    const item = subject?.item;
+    const actor = subject?.actor ?? item?.actor;
     if (!actor) return;
 
     // Verifica se é o jogador configurado
@@ -48,7 +50,7 @@ Hooks.once("ready", () => {
 
     // Tenta tocar o áudio
     try {
-      AudioHelper.play({
+      foundry.audio.AudioHelper.play({
         src: audioPath,
         volume: volume,
         autoplay: true,

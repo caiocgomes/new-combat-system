@@ -1,3 +1,4 @@
+// Ported to Foundry 14 and dnd5e 6: attacks now live on activities, not items.
 Hooks.once("init", () => {
   game.settings.register("new-combat-system", "filterByRange", {
     name: "Filter targets by weapon range",
@@ -6,6 +7,28 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: true,
+  });
+
+  // Botão de dano na mensagem de resultado
+  Hooks.on("renderChatMessageHTML", (message, html) => {
+    for (const btn of html.querySelectorAll(".damage-roll-btn")) {
+      btn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        const { actorId, itemId, activityId, critical } = btn.dataset;
+        const item = game.actors.get(actorId)?.items.get(itemId);
+        if (!item) {
+          ui.notifications.warn("Arma não encontrada para rolar dano.");
+          return;
+        }
+        const activity = item.system.activities?.get(activityId)
+          ?? item.system.activities?.getByType("attack")?.[0];
+        if (!activity?.rollDamage) {
+          ui.notifications.warn("Ataque não encontrado para rolar dano.");
+          return;
+        }
+        await activity.rollDamage({ event, isCritical: critical === "true" });
+      });
+    }
   });
 });
 
@@ -19,60 +42,44 @@ Hooks.once("ready", () => {
     return;
   }
 
-  // Hook para botão de dano na mensagem de resultado
-  Hooks.on("renderChatMessage", (message, html, data) => {
-    html.find(".damage-roll-btn").on("click", async (event) => {
-      event.preventDefault();
-      const btn = event.currentTarget;
-      const actorId = btn.dataset.actorId;
-      const itemId = btn.dataset.itemId;
-
-      const actor = game.actors.get(actorId);
-      const item = actor?.items.get(itemId);
-      if (!item) {
-        ui.notifications.warn("Arma não encontrada para rolar dano.");
-        return;
-      }
-
-      await item.rollDamage();
-    });
-  });
-
   function getGridDistance(tokenA, tokenB) {
-    return canvas.grid.measureDistance(tokenA.center, tokenB.center, { gridSpaces: true });
+    return canvas.grid.measurePath([tokenA.center, tokenB.center]).distance;
   }
 
-  function getWeaponRange(item) {
-    const normal = item.system.range?.value || 5;
-    const long = item.system.range?.long || null;
-    return { normal, long };
+  function getAttackRange(activity) {
+    const weapon = activity.item.system.range ?? {};
+    const own = activity.range ?? {};
+    // Armas guardam alcance no item, a não ser que a atividade o substitua; magias usam a atividade
+    const source = activity.item.type === "weapon" && !own.override ? weapon : own;
+    const reach = weapon.reach || own.reach || 0;
+    const normal = source.value || reach || 5;
+    const long = source.long && source.long > normal ? source.long : null;
+    return { normal: Math.max(normal, reach), long };
   }
 
   function buildTargetDialogContent(combatants) {
     const radios = combatants
-      .map(
-        (c, i) => {
-          const distLabel = `(${Math.round(c.distance)}ft)`;
-          const disadvLabel = c.disadvantage ? ' <span style="color:#e74c3c; font-weight:bold;">⚠️ desvantagem</span>' : '';
-          return `<label style="display:block; margin:4px 0; cursor:pointer;">
+      .map((c, i) => {
+        const distLabel = `(${Math.round(c.distance)}ft)`;
+        const disadvLabel = c.disadvantage ? ' <span style="color:#e74c3c; font-weight:bold;">⚠️ desvantagem</span>' : "";
+        return `<label style="display:block; margin:4px 0; cursor:pointer;">
             <input type="radio" name="target" value="${c.tokenId}" ${i === 0 ? "checked" : ""}/>
-            ${c.name} <span style="opacity:0.7">${distLabel}</span>${disadvLabel}
+            ${foundry.utils.escapeHTML(c.name)} <span style="opacity:0.7">${distLabel}</span>${disadvLabel}
           </label>`;
-        }
-      )
+      })
       .join("");
-    return `<form><p><strong>Escolha o alvo:</strong></p>${radios}</form>`;
+    return `<p><strong>Escolha o alvo:</strong></p>${radios}`;
   }
 
   // Wrapper do ataque
   libWrapper.register(
     "new-combat-system",
-    "CONFIG.Item.documentClass.prototype.rollAttack",
+    "CONFIG.DND5E.activityTypes.attack.documentClass.prototype.rollAttack",
     async function (wrapped, ...args) {
       console.log("Interceptando ataque", this);
 
-      // Sem encounter ativo: ataque segue normalmente
-      if (!game.combat) {
+      // Sem encounter ativo ou sem cena: ataque segue normalmente
+      if (!game.combat || !canvas?.ready) {
         return wrapped(...args);
       }
 
@@ -82,8 +89,8 @@ Hooks.once("ready", () => {
         canvas.tokens.placeables.find((t) => t.actor?.id === this.actor.id);
 
       const filterByRange = game.settings.get("new-combat-system", "filterByRange");
-      const weaponRange = getWeaponRange(this);
-      const maxRange = weaponRange.long || weaponRange.normal;
+      const attackRange = getAttackRange(this);
+      const maxRange = attackRange.long || attackRange.normal;
 
       // Coleta combatentes válidos (exclui o atacante, exige token no canvas)
       let validCombatants = game.combat.combatants
@@ -96,13 +103,8 @@ Hooks.once("ready", () => {
         .map((c) => {
           const token = canvas.tokens.get(c.tokenId);
           const distance = attackerToken ? getGridDistance(attackerToken, token) : 0;
-          const disadvantage = weaponRange.long ? (distance > weaponRange.normal && distance <= weaponRange.long) : false;
-          return {
-            tokenId: c.tokenId,
-            name: c.name,
-            distance,
-            disadvantage,
-          };
+          const disadvantage = attackRange.long ? distance > attackRange.normal && distance <= attackRange.long : false;
+          return { tokenId: c.tokenId, name: c.name, distance, disadvantage };
         });
 
       if (filterByRange && attackerToken) {
@@ -115,65 +117,70 @@ Hooks.once("ready", () => {
       }
 
       // Dialog de seleção de alvo
-      const selectedTokenId = await Dialog.wait({
-        title: "Escolha o Alvo",
+      const selectedTokenId = await foundry.applications.api.DialogV2.wait({
+        window: { title: "Escolha o Alvo" },
         content: buildTargetDialogContent(validCombatants),
-        buttons: {
-          attack: {
-            icon: '<i class="fas fa-crosshairs"></i>',
+        buttons: [
+          {
+            action: "attack",
+            icon: "fa-solid fa-crosshairs",
             label: "Atacar",
-            callback: (html) => html.find('input[name="target"]:checked').val(),
+            default: true,
+            callback: (event, button) => button.form.elements.target?.value
+              ?? button.form.querySelector('input[name="target"]:checked')?.value ?? null,
           },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
+          {
+            action: "cancel",
+            icon: "fa-solid fa-xmark",
             label: "Cancelar",
             callback: () => null,
           },
-        },
-        default: "attack",
-        close: () => null,
+        ],
+        rejectClose: false,
       });
 
       // Cancelou ou fechou: não ataca
-      if (!selectedTokenId) return null;
+      if (!selectedTokenId || selectedTokenId === "cancel") return null;
 
       // Executa o ataque
-      const attackRoll = await wrapped(...args);
+      const attackRolls = await wrapped(...args);
 
       // Atacante cancelou o dialog de ataque
-      if (!attackRoll) return null;
+      const attackRoll = attackRolls?.[0];
+      if (!attackRoll) return attackRolls ?? null;
 
       // Rola defesa automaticamente
       const targetToken = canvas.tokens.get(selectedTokenId);
-      if (!targetToken?.actor) return attackRoll;
+      if (!targetToken?.actor) return attackRolls;
 
       const targetActor = targetToken.actor;
       const defenseBonus = targetActor.system.attributes.ac.value - 10;
-      const defenseRoll = await new Roll(`1d20 + ${defenseBonus}`).evaluate({async: true});
+      const defenseRoll = await new Roll(`1d20 + ${defenseBonus}`).evaluate();
 
       // Compara resultado
       const hit = attackRoll.total >= defenseRoll.total;
       const resultText = hit ? "✅ O ataque <strong>ACERTOU</strong>!" : "❌ O ataque <strong>ERROU</strong>!";
 
       // Mensagem unificada com resultado e botão de dano
-      const attackerName = this.actor.name;
+      const attackerName = foundry.utils.escapeHTML(this.actor.name);
+      const targetName = foundry.utils.escapeHTML(targetActor.name);
       const content = `
         <div style="border:1px solid #999; border-radius:6px; padding:8px; margin:4px 0;">
-          <p><strong>⚔️ ${attackerName} atacou ${targetActor.name}!</strong></p>
+          <p><strong>⚔️ ${attackerName} atacou ${targetName}!</strong></p>
           <p>🎲 Ataque: <strong>${attackRoll.total}</strong> <span style="opacity:0.7">(${attackRoll.formula})</span></p>
           <p>🛡️ Defesa: <strong>${defenseRoll.total}</strong> <span style="opacity:0.7">(1d20 + ${defenseBonus})</span></p>
           <p>${resultText}</p>
-          <button class="damage-roll-btn" data-actor-id="${this.actor.id}" data-item-id="${this.id}">🎲 Rolar Dano</button>
+          <button type="button" class="damage-roll-btn" data-actor-id="${this.actor.id}" data-item-id="${this.item.id}" data-activity-id="${this.id}" data-critical="${attackRoll.isCritical === true}">🎲 Rolar Dano</button>
         </div>
       `;
 
       await ChatMessage.create({
-        user: game.user.id,
+        author: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         content,
       });
 
-      return attackRoll;
+      return attackRolls;
     },
     "MIXED"
   );
