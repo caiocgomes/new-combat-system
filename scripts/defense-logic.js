@@ -42,8 +42,29 @@ Hooks.once("ready", () => {
     return;
   }
 
+  // Centros dos quadrados ocupados pelo token. getOccupiedGridSpaceOffsets repete
+  // cada quadrado por nível de profundidade, por isso a deduplicação em i,j.
+  function getOccupiedPoints(token) {
+    const cells = new Map();
+    for (const offset of token.document.getOccupiedGridSpaceOffsets()) {
+      const key = `${offset.i},${offset.j}`;
+      if (cells.has(key)) continue;
+      const { x, y } = canvas.grid.getCenterPoint(offset);
+      cells.set(key, { x, y });
+    }
+    return cells.size ? [...cells.values()] : [token.center];
+  }
+
+  // Distância entre os quadrados mais próximos, para que tokens grandes possam ser
+  // atacados a partir da borda. Medir de centro a centro exigia estar sobre o alvo.
   function getGridDistance(tokenA, tokenB) {
-    return canvas.grid.measurePath([tokenA.center, tokenB.center]).distance;
+    let min = Infinity;
+    for (const a of getOccupiedPoints(tokenA)) {
+      for (const b of getOccupiedPoints(tokenB)) {
+        min = Math.min(min, canvas.grid.measurePath([a, b]).distance);
+      }
+    }
+    return min;
   }
 
   function getAttackRange(activity) {
