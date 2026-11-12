@@ -293,8 +293,9 @@ Hooks.once("ready", () => {
     const defenseBonus = targetActor.system.attributes.ac.value - 10;
     const defenseRoll = await new Roll(`1d20 + ${defenseBonus}`).evaluate();
 
-    // Compara resultado
-    const hit = attackRoll.total >= defenseRoll.total;
+    // Compara resultado. Empate é do defensor, pelas regras de Garen: o ataque só
+    // acerta se superar a defesa.
+    const hit = attackRoll.total > defenseRoll.total;
     const resultText = hit ? "✅ O ataque <strong>ACERTOU</strong>!" : "❌ O ataque <strong>ERROU</strong>!";
 
     // Mensagem unificada com resultado e botão de dano
