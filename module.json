@@ -2,7 +2,7 @@
   "id": "new-combat-system",
   "title": "Custom Combat System",
   "description": "New combat system for Dnd 5e on Garen",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "authors": [
     { "name": "Victor Caparica" },
     { "name": "Caio Gomes" },
@@ -23,6 +23,7 @@
   "languages": [
     { "lang": "en", "name": "English", "path": "lang/en.json" }
   ],
+  "socket": true,
   "scripts": [
     "scripts/defense-logic.js",
     "scripts/crit-damage.js",
@@ -30,5 +31,5 @@
   ],
   "url": "https://github.com/caiocgomes/new-combat-system",
   "manifest": "https://raw.githubusercontent.com/caiocgomes/new-combat-system/refs/heads/main/module.json",
-  "download": "https://github.com/caiocgomes/new-combat-system/archive/refs/tags/v1.6.1.zip"
+  "download": "https://github.com/caiocgomes/new-combat-system/archive/refs/tags/v1.7.0.zip"
 }
